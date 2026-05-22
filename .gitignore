@@ -1,0 +1,24 @@
+# Object files
+*.o
+*.obj
+
+# Executables (standard names)
+*.exe
+*.out
+*.app
+
+# Shared libraries
+*.so
+*.dll
+*.dylib
+
+# Debug files
+*.dSYM/
+*.pdb
+
+# Build directories (if you use them)
+build/
+bin/
+obj/
+
+nwws_client
