@@ -45,7 +45,8 @@
 #include "file_io.h"
 #include "nwws_state.h"
 
-static const char data_dir[] = "/home/ayoung/nwws_oi/";
+/* CHANGE THIS TO YOUR LOCAL DIRECTORY */
+static const char data_dir[] = "/path/to/save_location/";
 
 //int safe_fopen(filename?)
 
