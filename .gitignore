@@ -20,5 +20,6 @@
 build/
 bin/
 obj/
+.vscode/
 
 nwws_client

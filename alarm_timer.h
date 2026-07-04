@@ -1,13 +1,14 @@
-#ifndef ALARM_TIMER_H
-#define ALARM_TIMER_H
-
 /**
  * @file alarm_timer.h
+ * @brief Declares the NWWS client health-check alarm timer interface.
  *
- * @brief Header file for alarm timer handlers.
- * @author Adam Young
+ * This header declares the alarm interval helper and timed handler used to
+ * monitor whether NWWS data is still being received and to request reconnects
+ * when the client appears idle.
  *
- * @date February 7, 2024
+ * @author W. Adam Young
+ *
+ * @date 2024-02-07
  *
  * @par MIT License
  *
@@ -32,6 +33,9 @@
  * SOFTWARE.
  *
  */
+
+#ifndef ALARM_TIMER_H
+#define ALARM_TIMER_H
 
 #include <strophe.h>
 

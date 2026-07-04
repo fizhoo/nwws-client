@@ -1,9 +1,20 @@
-/*
- * alarm_timer.c
+/**
+ * @file alarm_timer.c
+ * @brief Implements the NWWS client health-check alarm timer.
  *
- * MIT License
+ * This file provides the timed handler used to verify that NWWS data is still
+ * being received. If no data has arrived during the health-check interval, the
+ * handler writes an alarm marker file and requests an XMPP reconnect.
  *
- * Copyright (c) 2022 W. Adam Young
+ * The alarm interval defaults to 180 seconds and may be configured with the
+ * NWWS_ALARM_INTERVAL_SECONDS environment variable.
+ *
+ * @author W. Adam Young
+ * @date 2024-02-07
+ *
+ * @par MIT License
+ *
+ * Copyright (c) 2024 W. Adam Young
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
