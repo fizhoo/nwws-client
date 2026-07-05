@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 /** @file nwws_client.c
  *
  * @brief This is the main program of nwws_client, which is used to receive

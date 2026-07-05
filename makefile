@@ -4,7 +4,7 @@ CC = gcc
 LD = gcc
 
 # Compiler flags
-CFLAGS_COMMON  = -Wall -Wextra -Wpedantic
+CFLAGS_COMMON  = -Wall -Wextra -Wpedantic -MMD -MP
 CFLAGS_DEBUG   = $(CFLAGS_COMMON) -O0 -g -fsanitize=address -fanalyzer
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2 -DNDEBUG
 CFLAGS ?= $(CFLAGS_DEBUG)
@@ -20,6 +20,7 @@ RM = /bin/rm -f
 
 # Objects and target
 OBJS = nwws_client.o file_io.o alarm_timer.o text_utils.o xmpp_connect.o xmpp_ping.o log.o
+DEPS = $(OBJS:.o=.d)
 PROG = nwws_client
 
 # Default target
@@ -37,6 +38,8 @@ release:
 $(PROG): $(OBJS)
 	$(LD) $(OBJS) $(LDFLAGS) -o $(PROG)
 
+-include $(DEPS)
+
 # Clean generated files
 clean:
-	$(RM) $(PROG) $(OBJS)
+	$(RM) $(PROG) $(OBJS) $(DEPS)
