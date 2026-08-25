@@ -51,10 +51,14 @@
  * attributes. It uses all of the information to create a unique
  * file name in a directory. All bulletins are saved in their
  * own directory based on "cccc" param. (i.e. cccc = KFWD).
+ * Attribute values are validated before any filesystem operation. The issuing
+ * center and WMO heading must be fixed-length alphanumeric fields, the AWIPS ID
+ * must contain four to six alphanumeric characters, and the NWWS ID is limited
+ * to portable filename characters.
  *
  * @param data Null-terminated string of the extracted NWS bulletin
  * @param cccc Four character issuing center (i.e. KFWD, KICT, etc)
- * @param awipsid The six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
+ * @param awipsid The four-to-six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
  * @param ttaaii The six character WMO product ID. See https://www.weather.gov/tg/headef
  * @param id Unique id. See https://www.weather.gov/nwws/configuration.
  * @return int 

@@ -85,7 +85,8 @@ static int stanza_attributes_missing(const char *awipsid,
                                      const char *id)
 {
     return awipsid == NULL || ttaaii == NULL || cccc == NULL || id == NULL ||
-           (*awipsid == '\0') || (*ttaaii == '\0');
+           (*awipsid == '\0') || (*ttaaii == '\0') || (*cccc == '\0') ||
+           (*id == '\0');
 }
 
 static void reset_connection_runtime_state(void)
