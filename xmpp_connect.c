@@ -59,11 +59,8 @@
 #include "xmpp_connect.h"
 
 static const char *host = "nwws-oi.weather.gov";
-static bool message_handler_added = false;
 static const unsigned int reconnect_delay_seconds = 5;
-static bool ping_handler_added = false;
-static bool ping_stanza_handler_added = false;
-static bool alarm_handler_added = false;
+static bool handlers_registered = false;
 
 static int message_handler(xmpp_conn_t * const conn,
                            xmpp_stanza_t * const stanza,
@@ -91,10 +88,6 @@ static int stanza_attributes_missing(const char *awipsid,
 
 static void reset_connection_runtime_state(void)
 {
-    message_handler_added = false;
-    ping_handler_added = false;
-    ping_stanza_handler_added = false;
-    alarm_handler_added = false;
     xmpp_ping_reset_state();
 }
 
@@ -253,18 +246,22 @@ int nwws_connect_new (const char *jid, const char *pass)
         log_error("ERROR: Setting up Strophe connection object failed. Quitting.");
         return 1;
     }
+
+    handlers_registered = false;
+
         /* configure connection properties (optional) */
 /*   if((xmpp_conn_set_flags(conn, XMPP_CONN_FLAG_TRUST_TLS))!=XMPP_EOK) {
         fprintf(stderr,"ERROR: Can set connection flags. Quitting\n");
         return 1;
     }*/
 
-    /* Disable Stream Management for fault-injection stability. */
+/*  Disable Stream Management if reconnect fault testing requires it.
     if ((xmpp_conn_set_flags(conn, XMPP_CONN_FLAG_DISABLE_SM)) != XMPP_EOK) {
         fprintf(stderr, "ERROR: Can set connection flags. Quitting\n");
         return 1;
     }
-    
+*/
+
     /* configure TCP keepalive (optional)
      * Returns VOID */
      
@@ -315,27 +312,14 @@ log_debug("reconnect req = %d\n",g_nwws_state.reconnect_requested);
         g_nwws_state.reconnect_requested = 0;
         log_debug("connection is %s.", secured ? "secured" : "NOT secured");
                               
-        // Check if the message handler has already been added
-        if (!message_handler_added) {
+        if (!handlers_registered) {
             xmpp_handler_add(conn, message_handler, NULL, "message", NULL, ctx);
-            message_handler_added = true;  // Mark that the handler has been added
-        }
-
-        if (!ping_handler_added) {
             xmpp_timed_handler_add(conn, xmpp_ping_timed_handler,
                                    xmpp_ping_interval_ms(), ctx);
-            ping_handler_added = true;
-        }
-
-        if (!ping_stanza_handler_added) {
             xmpp_handler_add(conn, xmpp_ping_stanza_handler, NULL, "iq", NULL, ctx);
-            ping_stanza_handler_added = true;
-        }
-
-        if (!alarm_handler_added) {
             xmpp_timed_handler_add(conn, alarm_timed_handler,
                                    alarm_interval_ms(), NULL);
-            alarm_handler_added = true;
+            handlers_registered = true;
         }
         
         //  xmpp_handler_add(conn, message_handler, NULL, "message", NULL, ctx);
