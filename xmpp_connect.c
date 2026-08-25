@@ -177,6 +177,7 @@ static int message_handler(xmpp_conn_t * const conn,
     cccc=xmpp_stanza_get_attribute(x,"cccc");
     id=xmpp_stanza_get_attribute(x,"id");
     ttaaii=xmpp_stanza_get_attribute(x,"ttaaii");
+    size_t payload_length = 0;
     
     /* If the AWIPS id or ttaaii is not provided,
      * then it is probably a test message and does not
@@ -189,10 +190,15 @@ static int message_handler(xmpp_conn_t * const conn,
         return 1;
     }
     
-    chomp(payload);
+    if (chomp(payload, &payload_length) < 0) {
+        log_warn("Processing NWWS bulletin payload failed.");
+        xmpp_free(ctx,bodytext);
+        xmpp_free(ctx,payload);
+        return 1;
+    }
     
     /* Send payload (actual NWS bulletin) to file write */
-    if ((write_data(payload,cccc,awipsid,ttaaii,id)) < 0)
+    if ((write_data(payload, payload_length, cccc, awipsid, ttaaii, id)) < 0)
     {
         log_warn("Writing NWWS bulletin to file failed.");
     }

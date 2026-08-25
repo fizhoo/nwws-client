@@ -1,6 +1,8 @@
 #ifndef TEXT_UTILS_H
 #define TEXT_UTILS_H
 
+#include <stddef.h>
+
 /** @file text_utils.h
  *
  * @brief Header file for text utility functions.
@@ -32,6 +34,6 @@
  *
  */
 
-int chomp(char *input);
+int chomp(char *input, size_t *output_length);
 
 #endif

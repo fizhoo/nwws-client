@@ -32,14 +32,21 @@
 #include <stddef.h>
 #include <string.h>
 
-int chomp(char *input)
+int chomp(char *input, size_t *output_length)
 {
     char *src;
     char *dest;
     size_t payload_length;
 
     if (input == NULL) {
+        if (output_length != NULL) {
+            *output_length = 0;
+        }
         return -1;
+    }
+
+    if (output_length != NULL) {
+        *output_length = 0;
     }
 
     payload_length = strlen(input);
@@ -58,5 +65,10 @@ int chomp(char *input)
     }
 
     *dest = '\0';
+
+    if (output_length != NULL) {
+        *output_length = (size_t)(dest - input);
+    }
+
     return 0;
 }
