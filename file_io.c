@@ -1,5 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
-
 /**
  * @file file_io.c
  * @brief Handles file operations of writing the
@@ -34,10 +32,10 @@
  */
 
 #include <stdio.h>
+#include <time.h>
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <limits.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -47,226 +45,86 @@
 #include "file_io.h"
 #include "nwws_state.h"
 
-#ifndef NAME_MAX
-#define NAME_MAX 255
-#endif
-
-#define CCCC_LENGTH 4
-#define TTAAII_LENGTH 6
-#define AWIPSID_MIN_LENGTH 4
-#define AWIPSID_MAX_LENGTH 6
-#define NWWS_ID_MAX_LENGTH 128
-
 /* CHANGE THIS TO YOUR LOCAL DIRECTORY */
-static const char data_dir[] = "/path/to/save_location";
+static const char data_dir[] = "/path/to/save_location/";
 
-static void lowercase_string(char *s)
+//int safe_fopen(filename?)
+
+int write_data(char *data, size_t data_length, const char *cccc,
+               const char *awipsid, const char *ttaaii, const char *id)
 {
-    if (s == NULL) {
-        return;
-    }
+    /* file_name is the actual name of the file
+     * dir_path is the directory path inclduing airport code (cccc)
+     * full_path_name is the directory path (dir_path) + file name
+     */
 
-    for (; *s != '\0'; s++) {
-        *s = (char)tolower((unsigned char)*s);
-    }
-}
-
-static int ascii_alphanumeric(int c)
-{
-    return (c >= 'A' && c <= 'Z') ||
-           (c >= 'a' && c <= 'z') ||
-           (c >= '0' && c <= '9');
-}
-
-static int valid_alphanumeric_field(const char *value,
-                                    size_t minimum_length,
-                                    size_t maximum_length)
-{
-    size_t length = 0;
-
-    if (value == NULL) {
-        return 0;
-    }
-
-    while (value[length] != '\0') {
-        if (length >= maximum_length ||
-            !ascii_alphanumeric((unsigned char)value[length])) {
-            return 0;
-        }
-        length++;
-    }
-
-    return length >= minimum_length;
-}
-
-static int valid_nwws_id(const char *id)
-{
-    size_t length = 0;
-
-    if (id == NULL) {
-        return 0;
-    }
-
-    while (id[length] != '\0') {
-        unsigned char character = (unsigned char)id[length];
-
-        if (length >= NWWS_ID_MAX_LENGTH ||
-            (!ascii_alphanumeric(character) && character != '.' &&
-             character != '_' && character != '-')) {
-            return 0;
-        }
-        if (character == '.' && length > 0 && id[length - 1] == '.') {
-            return 0;
-        }
-        length++;
-    }
-
-    return length > 0;
-}
-
-static nwws_write_result_t validate_bulletin_attributes(const char *cccc,
-                                                        const char *awipsid,
-                                                        const char *ttaaii,
-                                                        const char *id)
-{
-    if (!valid_alphanumeric_field(cccc, CCCC_LENGTH, CCCC_LENGTH)) {
-        return NWWS_WRITE_INVALID_CCCC;
-    }
-    if (!valid_alphanumeric_field(ttaaii, TTAAII_LENGTH, TTAAII_LENGTH)) {
-        return NWWS_WRITE_INVALID_TTAAII;
-    }
-    if (!valid_alphanumeric_field(awipsid, AWIPSID_MIN_LENGTH,
-                                  AWIPSID_MAX_LENGTH)) {
-        return NWWS_WRITE_INVALID_AWIPSID;
-    }
-    if (!valid_nwws_id(id)) {
-        return NWWS_WRITE_INVALID_ID;
-    }
-
-    return NWWS_WRITE_OK;
-}
-
-nwws_write_result_t write_data(const char *data, size_t data_length,
-                               const char *cccc, const char *awipsid,
-                               const char *ttaaii, const char *id)
-{
-    char center_dir[CCCC_LENGTH + 1] = {'\0'};
-    char file_name[NAME_MAX + 1] = {'\0'};
+    char file_name[MAX_FILENAME_LENGTH]= {'\0'}, dir_path[MAX_PATH_LENGTH]= {'\0'}, full_path_name[MAX_PATH_LENGTH+MAX_FILENAME_LENGTH]= {'\0'};
 
     FILE *dump;
-    int center_fd;
-    int data_dir_fd;
-    int fd;
-    int n;
-    int saved_errno;
-    nwws_write_result_t validation_result;
+  //  int file=0;
 
-    if (data == NULL) {
-        errno = EINVAL;
-        return NWWS_WRITE_ERROR;
-    }
-
-    validation_result = validate_bulletin_attributes(cccc, awipsid, ttaaii, id);
-    if (validation_result != NWWS_WRITE_OK) {
-        errno = EINVAL;
-        return validation_result;
-    }
+    if(data==NULL) /*Need to do additional error checking maybe */
+        return -1;
 
     /* Build file name  */
-    errno = 0;
-    n = snprintf(center_dir, sizeof center_dir, "%s", cccc);
-    if (n < 0) {
-        if (errno == 0) {
-            errno = EIO;
+    snprintf(file_name,MAX_FILENAME_LENGTH,"%s-%s_%s-%s.txt",cccc,ttaaii,awipsid,id);
+    snprintf(dir_path, MAX_PATH_LENGTH, "%s%s/", data_dir, cccc);
+    snprintf(full_path_name, MAX_PATH_LENGTH+MAX_FILENAME_LENGTH, "%s%s", dir_path, file_name);
+
+    size_t i = 0;
+
+    /* Convert file name and path to lower case */
+    while (!(full_path_name[i] == '\0' && dir_path[i] == '\0')) {
+        if (full_path_name[i] != '\0') {
+            full_path_name[i] = (char)tolower((unsigned char)full_path_name[i]);
         }
-        return NWWS_WRITE_ERROR;
-    }
-    if ((size_t)n >= sizeof center_dir) {
-        errno = ENAMETOOLONG;
-        return NWWS_WRITE_ERROR;
-    }
-
-    errno = 0;
-    n = snprintf(file_name, sizeof file_name, "%s-%s_%s-%s.txt", cccc, ttaaii, awipsid, id);
-    if (n < 0) {
-        if (errno == 0) {
-            errno = EIO;
+        if (dir_path[i] != '\0') {
+            dir_path[i] = (char)tolower((unsigned char)dir_path[i]);
         }
-        return NWWS_WRITE_ERROR;
-    }
-    if ((size_t)n >= sizeof file_name) {
-        errno = ENAMETOOLONG;
-        return NWWS_WRITE_ERROR;
+        i++;
     }
 
-    lowercase_string(center_dir);
-    lowercase_string(file_name);
+    /* Create file first without checking if path is existing.
+     * If path is not there, then create path.
+     * Slight speed advantage after all directories have been made
+     * by incoming data. I.e. it saves a path check on every piece
+     * of incoming data
+     */
 
-    data_dir_fd = open(data_dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    if (data_dir_fd == -1) {
-        return NWWS_WRITE_ERROR;
-    }
-
-    if (mkdirat(data_dir_fd, center_dir, DIR_PERMS) == -1 && errno != EEXIST) {
-        saved_errno = errno;
-        close(data_dir_fd);
-        errno = saved_errno;
-        return NWWS_WRITE_ERROR;
-    }
-
-    center_fd = openat(data_dir_fd, center_dir,
-                       O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    if (center_fd == -1) {
-        saved_errno = errno;
-        close(data_dir_fd);
-        errno = saved_errno;
-        return NWWS_WRITE_ERROR;
-    }
-    close(data_dir_fd);
-
-    fd = openat(center_fd, file_name,
-                O_CREAT | O_WRONLY | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
-                FILE_PERMS);
+/* Open the file for writing, create directory if necessary */
+    int fd = open(full_path_name, O_CREAT | O_WRONLY | O_EXCL, FILE_PERMS);
     if (fd == -1) {
-        saved_errno = errno;
-        close(center_fd);
-        errno = saved_errno;
-        if (saved_errno == EEXIST) {
-            return NWWS_WRITE_DUPLICATE;
+        if (errno == ENOENT) {
+            /* Directory doesn't exist, create it */
+            if (mkdir(dir_path, DIR_PERMS) == -1) {
+                perror("Error creating issuing center directory");
+                return -1;
+            }
+            /* Retry opening the file after creating the directory */
+            fd = open(full_path_name, O_CREAT | O_WRONLY | O_EXCL, FILE_PERMS);
+            if (fd == -1) {
+                perror("Error opening file after creating directory");
+                return -1;
+            }
+        } else {
+            perror("Error opening file");
+            return -1;
         }
-        return NWWS_WRITE_ERROR;
     }
 
     dump = fdopen(fd, "w");
     if (dump == NULL) {
-        saved_errno = errno != 0 ? errno : EIO;
         close(fd);
-        unlinkat(center_fd, file_name, 0);
-        close(center_fd);
-        errno = saved_errno;
-        return NWWS_WRITE_ERROR;
+        return -1;
+        //Do error checking here
     }
-    errno = 0;
     if (fwrite(data, 1, data_length, dump) != data_length) {
-        saved_errno = errno != 0 ? errno : EIO;
         fclose(dump);
-        unlinkat(center_fd, file_name, 0);
-        close(center_fd);
-        errno = saved_errno;
-        return NWWS_WRITE_ERROR;
+        return -1;
     }
 
-    errno = 0;
-    if (fclose(dump) == EOF) {
-        saved_errno = errno != 0 ? errno : EIO;
-        unlinkat(center_fd, file_name, 0);
-        close(center_fd);
-        errno = saved_errno;
-        return NWWS_WRITE_ERROR;
-    }
-
-    close(center_fd);
+    fclose(dump);
     g_nwws_state.data_received = 1; //if we are here, we received valid data
 
-    return NWWS_WRITE_OK;
+    return 0;
 }

@@ -42,16 +42,6 @@
 #define FILE_PERMS (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)  // Read/write for owner, read for group/others 0644
 #define DIR_PERMS (S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) //Read/write/execute for owner, read/execute group/oth, 0755
 
-typedef enum {
-    NWWS_WRITE_ERROR = -1,
-    NWWS_WRITE_OK = 0,
-    NWWS_WRITE_DUPLICATE = 1,
-    NWWS_WRITE_INVALID_CCCC = 2,
-    NWWS_WRITE_INVALID_TTAAII = 3,
-    NWWS_WRITE_INVALID_AWIPSID = 4,
-    NWWS_WRITE_INVALID_ID = 5
-} nwws_write_result_t;
-
 /**
  *
  * @brief Write NWWS bulletin to a file
@@ -61,22 +51,17 @@ typedef enum {
  * attributes. It uses all of the information to create a unique
  * file name in a directory. All bulletins are saved in their
  * own directory based on "cccc" param. (i.e. cccc = KFWD).
- * Attribute values are validated before any filesystem operation. The issuing
- * center and WMO heading must be fixed-length alphanumeric fields, the AWIPS ID
- * must contain four to six alphanumeric characters, and the NWWS ID is limited
- * to portable filename characters.
  *
  * @param data Null-terminated string of the extracted NWS bulletin
+ * @param data_length Number of payload bytes to write
  * @param cccc Four character issuing center (i.e. KFWD, KICT, etc)
- * @param awipsid The four-to-six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
+ * @param awipsid The six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
  * @param ttaaii The six character WMO product ID. See https://www.weather.gov/tg/headef
  * @param id Unique id. See https://www.weather.gov/nwws/configuration.
- * @return A nwws_write_result_t identifying success, a duplicate, the invalid
- * attribute, or an I/O error with errno set.
+ * @return int
  *
  */
-nwws_write_result_t write_data(const char *data, size_t data_length,
-                               const char *cccc, const char *awipsid,
-                               const char *ttaaii, const char *id);
+int write_data(char *, size_t, const char *, const char *, const char *,
+               const char *);
 
 #endif
