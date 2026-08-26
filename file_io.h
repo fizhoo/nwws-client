@@ -42,6 +42,13 @@
 #define FILE_PERMS (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)  // Read/write for owner, read for group/others 0644
 #define DIR_PERMS (S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) //Read/write/execute for owner, read/execute group/oth, 0755
 
+typedef enum {
+    NWWS_WRITE_ERROR = -1,
+    NWWS_WRITE_OK = 0,
+    NWWS_WRITE_DUPLICATE = 1,
+    NWWS_WRITE_INVALID_ATTRIBUTES = 2
+} nwws_write_result_t;
+
 /**
  *
  * @brief Write NWWS bulletin to a file
@@ -61,9 +68,12 @@
  * @param awipsid The four-to-six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
  * @param ttaaii The six character WMO product ID. See https://www.weather.gov/tg/headef
  * @param id Unique id. See https://www.weather.gov/nwws/configuration.
- * @return int 
+ * @return NWWS_WRITE_OK, NWWS_WRITE_DUPLICATE,
+ * NWWS_WRITE_INVALID_ATTRIBUTES, or NWWS_WRITE_ERROR with errno set.
  *
  */
-int write_data(const char *data, size_t data_length, const char *cccc, const char *awipsid, const char *ttaaii, const char *id);
+nwws_write_result_t write_data(const char *data, size_t data_length,
+                               const char *cccc, const char *awipsid,
+                               const char *ttaaii, const char *id);
 
 #endif

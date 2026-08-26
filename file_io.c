@@ -136,7 +136,9 @@ static int valid_bulletin_attributes(const char *cccc,
            valid_nwws_id(id);
 }
 
-int write_data(const char *data, size_t data_length, const char *cccc, const char *awipsid, const char *ttaaii, const char *id)
+nwws_write_result_t write_data(const char *data, size_t data_length,
+                               const char *cccc, const char *awipsid,
+                               const char *ttaaii, const char *id)
 {
     char center_dir[CCCC_LENGTH + 1] = {'\0'};
     char file_name[NAME_MAX + 1] = {'\0'};
@@ -148,21 +150,41 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
     int n;
     int saved_errno;
 
-    if (data == NULL ||
-        !valid_bulletin_attributes(cccc, awipsid, ttaaii, id)) {
+    if (data == NULL) {
         errno = EINVAL;
-        return -1;
+        return NWWS_WRITE_ERROR;
+    }
+
+    if (!valid_bulletin_attributes(cccc, awipsid, ttaaii, id)) {
+        errno = EINVAL;
+        return NWWS_WRITE_INVALID_ATTRIBUTES;
     }
 
     /* Build file name  */
+    errno = 0;
     n = snprintf(center_dir, sizeof center_dir, "%s", cccc);
-    if (n < 0 || (size_t)n >= sizeof center_dir) {
-        return -1;
+    if (n < 0) {
+        if (errno == 0) {
+            errno = EIO;
+        }
+        return NWWS_WRITE_ERROR;
+    }
+    if ((size_t)n >= sizeof center_dir) {
+        errno = ENAMETOOLONG;
+        return NWWS_WRITE_ERROR;
     }
 
+    errno = 0;
     n = snprintf(file_name, sizeof file_name, "%s-%s_%s-%s.txt", cccc, ttaaii, awipsid, id);
-    if (n < 0 || (size_t)n >= sizeof file_name) {
-        return -1;
+    if (n < 0) {
+        if (errno == 0) {
+            errno = EIO;
+        }
+        return NWWS_WRITE_ERROR;
+    }
+    if ((size_t)n >= sizeof file_name) {
+        errno = ENAMETOOLONG;
+        return NWWS_WRITE_ERROR;
     }
 
     lowercase_string(center_dir);
@@ -170,18 +192,14 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
 
     data_dir_fd = open(data_dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (data_dir_fd == -1) {
-        saved_errno = errno;
-        perror("Error opening bulletin data directory");
-        errno = saved_errno;
-        return -1;
+        return NWWS_WRITE_ERROR;
     }
 
     if (mkdirat(data_dir_fd, center_dir, DIR_PERMS) == -1 && errno != EEXIST) {
         saved_errno = errno;
-        perror("Error creating issuing center directory");
         close(data_dir_fd);
         errno = saved_errno;
-        return -1;
+        return NWWS_WRITE_ERROR;
     }
 
     center_fd = openat(data_dir_fd, center_dir,
@@ -190,9 +208,7 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
         saved_errno = errno;
         close(data_dir_fd);
         errno = saved_errno;
-        perror("Error opening issuing center directory");
-        errno = saved_errno;
-        return -1;
+        return NWWS_WRITE_ERROR;
     }
     close(data_dir_fd);
 
@@ -203,19 +219,20 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
         saved_errno = errno;
         close(center_fd);
         errno = saved_errno;
-        perror("Error opening bulletin file");
-        errno = saved_errno;
-        return -1;
+        if (saved_errno == EEXIST) {
+            return NWWS_WRITE_DUPLICATE;
+        }
+        return NWWS_WRITE_ERROR;
     }
 
     dump = fdopen(fd, "w");
     if (dump == NULL) {
-        saved_errno = errno;
+        saved_errno = errno != 0 ? errno : EIO;
         close(fd);
         unlinkat(center_fd, file_name, 0);
         close(center_fd);
         errno = saved_errno;
-        return -1;
+        return NWWS_WRITE_ERROR;
     }
     errno = 0;
     if (fwrite(data, 1, data_length, dump) != data_length) {
@@ -224,7 +241,7 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
         unlinkat(center_fd, file_name, 0);
         close(center_fd);
         errno = saved_errno;
-        return -1;
+        return NWWS_WRITE_ERROR;
     }
 
     errno = 0;
@@ -233,11 +250,11 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
         unlinkat(center_fd, file_name, 0);
         close(center_fd);
         errno = saved_errno;
-        return -1;
+        return NWWS_WRITE_ERROR;
     }
 
     close(center_fd);
     g_nwws_state.data_received = 1; //if we are here, we received valid data
 
-    return 0;
+    return NWWS_WRITE_OK;
 }

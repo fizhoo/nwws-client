@@ -43,6 +43,7 @@
 //#define KA_INTERVAL 1
 
 #include <stdbool.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -137,6 +138,8 @@ static int message_handler(xmpp_conn_t * const conn,
     
     const char *awipsid, *cccc, *ttaaii, *id;
     char *payload, *bodytext;
+    nwws_write_result_t write_result;
+    int write_errno;
     
     /* Get BODY of message */
     body = xmpp_stanza_get_child_by_name(stanza, "body");
@@ -192,9 +195,15 @@ static int message_handler(xmpp_conn_t * const conn,
     }
     
     /* Send payload (actual NWS bulletin) to file write */
-    if ((write_data(payload, payload_length, cccc, awipsid, ttaaii, id)) < 0)
-    {
-        log_warn("Writing NWWS bulletin to file failed.");
+    write_result = write_data(payload, payload_length, cccc, awipsid, ttaaii, id);
+    write_errno = errno;
+    if (write_result == NWWS_WRITE_INVALID_ATTRIBUTES) {
+        log_warn("Rejected NWWS bulletin with invalid attributes.");
+    } else if (write_result == NWWS_WRITE_DUPLICATE) {
+        log_debug("Skipped duplicate NWWS bulletin.");
+    } else if (write_result == NWWS_WRITE_ERROR) {
+        log_warn("Writing NWWS bulletin to file failed: errno=%d (%s).",
+                 write_errno, strerror(write_errno));
     }
 
     /* WHITESPACE KEEPALIVE - I believe the NWWS-OI server is using
