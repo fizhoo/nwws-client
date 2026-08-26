@@ -1,6 +1,8 @@
 #ifndef FILE_IO_H
 #define FILE_IO_H
 
+#include <stddef.h>
+
 /**
  * @file file_io.h
  * @brief Header file for file_io.h
@@ -55,9 +57,9 @@
  * @param awipsid The six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
  * @param ttaaii The six character WMO product ID. See https://www.weather.gov/tg/headef
  * @param id Unique id. See https://www.weather.gov/nwws/configuration.
- * @return int 
+ * @return int
  *
  */
-int write_data(char *,const char *, const char *, const char *, const char *);
+int write_data(const char *data, size_t data_length, const char *cccc, const char *awipsid, const char *ttaaii, const char *id);
 
 #endif
