@@ -4,7 +4,7 @@
  *
  * This file provides the timed handler used to verify that NWWS data is still
  * being received. If no data has arrived during the health-check interval, the
- * handler writes an alarm marker file and requests an XMPP reconnect.
+ * handler logs a warning and requests an XMPP reconnect.
  *
  * The alarm interval defaults to 180 seconds and may be configured with the
  * NWWS_ALARM_INTERVAL_SECONDS environment variable.
@@ -36,7 +36,6 @@
  *
  */
 
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "alarm_timer.h"
@@ -77,11 +76,8 @@ int alarm_timed_handler(xmpp_conn_t *conn, void *userdata)
     }
 
     if (g_nwws_state.data_received == 0) {
-        FILE *tmp_alarm = fopen("/tmp/nwws_alarm.txt", "w");
-        if (tmp_alarm != NULL) {
-            fclose(tmp_alarm);
-        }
-
+        log_warn("No bulletin data received during health-check interval; "
+                 "requesting reconnect.");
         g_nwws_state.reconnect_requested = 1;
     }
 
