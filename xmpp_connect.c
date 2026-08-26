@@ -183,7 +183,12 @@ static int message_handler(xmpp_conn_t * const conn,
         return 1;
     }
     
-    chomp(payload, &payload_length);
+    if (chomp(payload, &payload_length) < 0) {
+        log_warn("Processing NWWS bulletin payload failed.");
+        xmpp_free(ctx,bodytext);
+        xmpp_free(ctx,payload);
+        return 1;
+    }
     
     /* Send payload (actual NWS bulletin) to file write */
     if ((write_data(payload, payload_length, cccc, awipsid, ttaaii, id)) < 0)

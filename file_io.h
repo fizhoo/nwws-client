@@ -53,7 +53,6 @@
  * own directory based on "cccc" param. (i.e. cccc = KFWD).
  *
  * @param data Null-terminated string of the extracted NWS bulletin
- * @param data_length Number of payload bytes to write
  * @param cccc Four character issuing center (i.e. KFWD, KICT, etc)
  * @param awipsid The six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
  * @param ttaaii The six character WMO product ID. See https://www.weather.gov/tg/headef
@@ -61,7 +60,6 @@
  * @return int
  *
  */
-int write_data(char *, size_t, const char *, const char *, const char *,
-               const char *);
+int write_data(const char *data, size_t data_length, const char *cccc, const char *awipsid, const char *ttaaii, const char *id);
 
 #endif

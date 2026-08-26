@@ -36,6 +36,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -45,43 +46,68 @@
 #include "file_io.h"
 #include "nwws_state.h"
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+#ifndef NAME_MAX
+#define NAME_MAX 255
+#endif
+
 /* CHANGE THIS TO YOUR LOCAL DIRECTORY */
 static const char data_dir[] = "/path/to/save_location/";
 
 //int safe_fopen(filename?)
 
-int write_data(char *data, size_t data_length, const char *cccc,
-               const char *awipsid, const char *ttaaii, const char *id)
+static void lowercase_string(char *s)
+{
+    if (s == NULL) {
+        return;
+    }
+
+    for (; *s != '\0'; s++) {
+        *s = (char)tolower((unsigned char)*s);
+    }
+}
+
+int write_data(const char *data, size_t data_length, const char *cccc, const char *awipsid, const char *ttaaii, const char *id)
 {
     /* file_name is the actual name of the file
      * dir_path is the directory path inclduing airport code (cccc)
      * full_path_name is the directory path (dir_path) + file name
      */
 
-    char file_name[MAX_FILENAME_LENGTH]= {'\0'}, dir_path[MAX_PATH_LENGTH]= {'\0'}, full_path_name[MAX_PATH_LENGTH+MAX_FILENAME_LENGTH]= {'\0'};
+    char center_dir[5]= {'\0'}, file_name[NAME_MAX + 1]= {'\0'}, dir_path[PATH_MAX]= {'\0'}, full_path_name[PATH_MAX]= {'\0'};
 
     FILE *dump;
+    int n;
   //  int file=0;
 
-    if(data==NULL) /*Need to do additional error checking maybe */
+    if(data==NULL || cccc==NULL || awipsid==NULL || ttaaii==NULL || id==NULL) /*Need to do additional error checking maybe */
         return -1;
 
     /* Build file name  */
-    snprintf(file_name,MAX_FILENAME_LENGTH,"%s-%s_%s-%s.txt",cccc,ttaaii,awipsid,id);
-    snprintf(dir_path, MAX_PATH_LENGTH, "%s%s/", data_dir, cccc);
-    snprintf(full_path_name, MAX_PATH_LENGTH+MAX_FILENAME_LENGTH, "%s%s", dir_path, file_name);
+    n = snprintf(center_dir, sizeof center_dir, "%s", cccc);
+    if (n < 0 || (size_t)n >= sizeof center_dir) {
+        return -1;
+    }
 
-    size_t i = 0;
+    n = snprintf(file_name, sizeof file_name, "%s-%s_%s-%s.txt", cccc, ttaaii, awipsid, id);
+    if (n < 0 || (size_t)n >= sizeof file_name) {
+        return -1;
+    }
 
-    /* Convert file name and path to lower case */
-    while (!(full_path_name[i] == '\0' && dir_path[i] == '\0')) {
-        if (full_path_name[i] != '\0') {
-            full_path_name[i] = (char)tolower((unsigned char)full_path_name[i]);
-        }
-        if (dir_path[i] != '\0') {
-            dir_path[i] = (char)tolower((unsigned char)dir_path[i]);
-        }
-        i++;
+    lowercase_string(center_dir);
+    lowercase_string(file_name);
+
+    n = snprintf(dir_path, sizeof dir_path, "%s%s/", data_dir, center_dir);
+    if (n < 0 || (size_t)n >= sizeof dir_path) {
+        return -1;
+    }
+
+    n = snprintf(full_path_name, sizeof full_path_name, "%s%s", dir_path, file_name);
+    if (n < 0 || (size_t)n >= sizeof full_path_name) {
+        return -1;
     }
 
     /* Create file first without checking if path is existing.
@@ -96,7 +122,7 @@ int write_data(char *data, size_t data_length, const char *cccc,
     if (fd == -1) {
         if (errno == ENOENT) {
             /* Directory doesn't exist, create it */
-            if (mkdir(dir_path, DIR_PERMS) == -1) {
+            if (mkdir(dir_path, DIR_PERMS) == -1 && errno != EEXIST) {
                 perror("Error creating issuing center directory");
                 return -1;
             }
