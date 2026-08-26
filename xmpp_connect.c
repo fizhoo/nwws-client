@@ -59,6 +59,9 @@
 #include "xmpp_ping.h"
 #include "xmpp_connect.h"
 
+#define LOGGED_ATTRIBUTE_INPUT_LIMIT 128
+#define LOGGED_ATTRIBUTE_BUFFER_SIZE ((LOGGED_ATTRIBUTE_INPUT_LIMIT * 4) + 4)
+
 static const char *host = "nwws-oi.weather.gov";
 static const unsigned int reconnect_delay_seconds = 5;
 static bool handlers_registered = false;
@@ -76,6 +79,56 @@ static int nwws_connect_with_retry(xmpp_conn_t *conn, const char *host,
 static void nwws_run_loop(xmpp_conn_t *conn, xmpp_ctx_t *ctx);
 static void reset_connection_runtime_state(void);
 static void run_retry_delay(xmpp_ctx_t *ctx, unsigned int delay_ms);
+
+static void escape_attribute_for_log(const char *value,
+                                     char *escaped,
+                                     size_t escaped_size)
+{
+    size_t input_offset = 0;
+    size_t output_offset = 0;
+
+    if (escaped_size == 0) {
+        return;
+    }
+    if (value == NULL) {
+        snprintf(escaped, escaped_size, "(null)");
+        return;
+    }
+
+    while (value[input_offset] != '\0' &&
+           input_offset < LOGGED_ATTRIBUTE_INPUT_LIMIT) {
+        unsigned char character = (unsigned char)value[input_offset];
+
+        if (character >= 0x20 && character <= 0x7e &&
+            character != '\\' && character != '"') {
+            if (output_offset + 1 >= escaped_size) {
+                break;
+            }
+            escaped[output_offset++] = (char)character;
+        } else if (character == '\\' || character == '"') {
+            if (output_offset + 2 >= escaped_size) {
+                break;
+            }
+            escaped[output_offset++] = '\\';
+            escaped[output_offset++] = (char)character;
+        } else {
+            if (output_offset + 4 >= escaped_size) {
+                break;
+            }
+            snprintf(escaped + output_offset, escaped_size - output_offset,
+                     "\\x%02X", character);
+            output_offset += 4;
+        }
+        input_offset++;
+    }
+
+    if (value[input_offset] != '\0' && output_offset + 3 < escaped_size) {
+        escaped[output_offset++] = '.';
+        escaped[output_offset++] = '.';
+        escaped[output_offset++] = '.';
+    }
+    escaped[output_offset] = '\0';
+}
 
 static int stanza_attributes_missing(const char *awipsid,
                                      const char *ttaaii,
@@ -138,6 +191,7 @@ static int message_handler(xmpp_conn_t * const conn,
     
     const char *awipsid, *cccc, *ttaaii, *id;
     char *payload, *bodytext;
+    char escaped_attribute[LOGGED_ATTRIBUTE_BUFFER_SIZE];
     nwws_write_result_t write_result;
     int write_errno;
     
@@ -197,8 +251,27 @@ static int message_handler(xmpp_conn_t * const conn,
     /* Send payload (actual NWS bulletin) to file write */
     write_result = write_data(payload, payload_length, cccc, awipsid, ttaaii, id);
     write_errno = errno;
-    if (write_result == NWWS_WRITE_INVALID_ATTRIBUTES) {
-        log_warn("Rejected NWWS bulletin with invalid attributes.");
+    if (write_result == NWWS_WRITE_INVALID_CCCC) {
+        escape_attribute_for_log(cccc, escaped_attribute,
+                                 sizeof escaped_attribute);
+        log_warn("Rejected NWWS bulletin: cccc=\"%s\"; expected exactly four "
+                 "ASCII alphanumeric characters.", escaped_attribute);
+    } else if (write_result == NWWS_WRITE_INVALID_TTAAII) {
+        escape_attribute_for_log(ttaaii, escaped_attribute,
+                                 sizeof escaped_attribute);
+        log_warn("Rejected NWWS bulletin: ttaaii=\"%s\"; expected exactly six "
+                 "ASCII alphanumeric characters.", escaped_attribute);
+    } else if (write_result == NWWS_WRITE_INVALID_AWIPSID) {
+        escape_attribute_for_log(awipsid, escaped_attribute,
+                                 sizeof escaped_attribute);
+        log_warn("Rejected NWWS bulletin: awipsid=\"%s\"; expected four to six "
+                 "ASCII alphanumeric characters.", escaped_attribute);
+    } else if (write_result == NWWS_WRITE_INVALID_ID) {
+        escape_attribute_for_log(id, escaped_attribute,
+                                 sizeof escaped_attribute);
+        log_warn("Rejected NWWS bulletin: id=\"%s\"; expected 1-128 ASCII "
+                 "letters, digits, '.', '_', or '-' without consecutive "
+                 "periods.", escaped_attribute);
     } else if (write_result == NWWS_WRITE_DUPLICATE) {
         log_debug("Skipped duplicate NWWS bulletin.");
     } else if (write_result == NWWS_WRITE_ERROR) {

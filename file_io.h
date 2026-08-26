@@ -46,7 +46,10 @@ typedef enum {
     NWWS_WRITE_ERROR = -1,
     NWWS_WRITE_OK = 0,
     NWWS_WRITE_DUPLICATE = 1,
-    NWWS_WRITE_INVALID_ATTRIBUTES = 2
+    NWWS_WRITE_INVALID_CCCC = 2,
+    NWWS_WRITE_INVALID_TTAAII = 3,
+    NWWS_WRITE_INVALID_AWIPSID = 4,
+    NWWS_WRITE_INVALID_ID = 5
 } nwws_write_result_t;
 
 /**
@@ -68,8 +71,8 @@ typedef enum {
  * @param awipsid The four-to-six character AWIPS ID, sometimes called AFOS PIL See https://www.weather.gov/tg/awips
  * @param ttaaii The six character WMO product ID. See https://www.weather.gov/tg/headef
  * @param id Unique id. See https://www.weather.gov/nwws/configuration.
- * @return NWWS_WRITE_OK, NWWS_WRITE_DUPLICATE,
- * NWWS_WRITE_INVALID_ATTRIBUTES, or NWWS_WRITE_ERROR with errno set.
+ * @return A nwws_write_result_t identifying success, a duplicate, the invalid
+ * attribute, or an I/O error with errno set.
  *
  */
 nwws_write_result_t write_data(const char *data, size_t data_length,

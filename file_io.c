@@ -124,16 +124,26 @@ static int valid_nwws_id(const char *id)
     return length > 0;
 }
 
-static int valid_bulletin_attributes(const char *cccc,
-                                     const char *awipsid,
-                                     const char *ttaaii,
-                                     const char *id)
+static nwws_write_result_t validate_bulletin_attributes(const char *cccc,
+                                                        const char *awipsid,
+                                                        const char *ttaaii,
+                                                        const char *id)
 {
-    return valid_alphanumeric_field(cccc, CCCC_LENGTH, CCCC_LENGTH) &&
-           valid_alphanumeric_field(ttaaii, TTAAII_LENGTH, TTAAII_LENGTH) &&
-           valid_alphanumeric_field(awipsid, AWIPSID_MIN_LENGTH,
-                                    AWIPSID_MAX_LENGTH) &&
-           valid_nwws_id(id);
+    if (!valid_alphanumeric_field(cccc, CCCC_LENGTH, CCCC_LENGTH)) {
+        return NWWS_WRITE_INVALID_CCCC;
+    }
+    if (!valid_alphanumeric_field(ttaaii, TTAAII_LENGTH, TTAAII_LENGTH)) {
+        return NWWS_WRITE_INVALID_TTAAII;
+    }
+    if (!valid_alphanumeric_field(awipsid, AWIPSID_MIN_LENGTH,
+                                  AWIPSID_MAX_LENGTH)) {
+        return NWWS_WRITE_INVALID_AWIPSID;
+    }
+    if (!valid_nwws_id(id)) {
+        return NWWS_WRITE_INVALID_ID;
+    }
+
+    return NWWS_WRITE_OK;
 }
 
 nwws_write_result_t write_data(const char *data, size_t data_length,
@@ -149,15 +159,17 @@ nwws_write_result_t write_data(const char *data, size_t data_length,
     int fd;
     int n;
     int saved_errno;
+    nwws_write_result_t validation_result;
 
     if (data == NULL) {
         errno = EINVAL;
         return NWWS_WRITE_ERROR;
     }
 
-    if (!valid_bulletin_attributes(cccc, awipsid, ttaaii, id)) {
+    validation_result = validate_bulletin_attributes(cccc, awipsid, ttaaii, id);
+    if (validation_result != NWWS_WRITE_OK) {
         errno = EINVAL;
-        return NWWS_WRITE_INVALID_ATTRIBUTES;
+        return validation_result;
     }
 
     /* Build file name  */
