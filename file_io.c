@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #include "file_io.h"
+#include "log.h"
 #include "nwws_state.h"
 
 #ifndef PATH_MAX
@@ -70,6 +71,30 @@ static void lowercase_string(char *s)
     }
 }
 
+static int safe_path_component(const char *component)
+{
+    const unsigned char *p;
+
+    if (component == NULL || component[0] == '\0') {
+        return 0;
+    }
+
+    if (strcmp(component, ".") == 0 || strcmp(component, "..") == 0) {
+        return 0;
+    }
+
+    for (p = (const unsigned char *)component; *p != '\0'; p++) {
+        if (*p == '/' || *p == '\\') {
+            return 0;
+        }
+        if (*p < 0x20 || *p == 0x7f) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 int write_data(const char *data, size_t data_length, const char *cccc, const char *awipsid, const char *ttaaii, const char *id)
 {
     /* file_name is the actual name of the file
@@ -94,6 +119,16 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
 
     n = snprintf(file_name, sizeof file_name, "%s-%s_%s-%s.txt", cccc, ttaaii, awipsid, id);
     if (n < 0 || (size_t)n >= sizeof file_name) {
+        return -1;
+    }
+
+    if (!safe_path_component(center_dir)) {
+        log_warn("Refusing bulletin with unsafe issuing-center component.");
+        return -1;
+    }
+
+    if (!safe_path_component(file_name)) {
+        log_warn("Refusing bulletin with unsafe filename component.");
         return -1;
     }
 
@@ -132,6 +167,9 @@ int write_data(const char *data, size_t data_length, const char *cccc, const cha
                 perror("Error opening file after creating directory");
                 return -1;
             }
+        } else if (errno == EEXIST) {
+            g_nwws_state.data_received = 1;
+            return 0;
         } else {
             perror("Error opening file");
             return -1;

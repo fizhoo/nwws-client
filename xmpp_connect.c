@@ -254,12 +254,12 @@ int nwws_connect_new (const char *jid, const char *pass)
         return 1;
     }*/
 
-/*  Disable Stream Management if reconnect fault testing requires it.
+    /* NWWS-OI rejects libstrophe's stream-resumption attempt with
+     * item-not-found, which can leave the connection in a reconnect loop. */
     if ((xmpp_conn_set_flags(conn, XMPP_CONN_FLAG_DISABLE_SM)) != XMPP_EOK) {
-        fprintf(stderr, "ERROR: Can set connection flags. Quitting\n");
+        log_error("Disabling XMPP stream management failed. Quitting.");
         return 1;
     }
-*/
 
     /* configure TCP keepalive (optional)
      * Returns VOID */
@@ -342,6 +342,7 @@ int nwws_connect(xmpp_conn_t *conn, const char *host, unsigned short port,xmpp_c
     }
 
     nwws_run_loop(conn, ctx);
+    log_info("Shutdown requested; disconnecting.");
     nwws_disconnect(conn, ctx);
     
     return 0;

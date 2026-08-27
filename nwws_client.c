@@ -44,7 +44,6 @@
 
 #define DEBUG 0
 
-#include <stdio.h>
 #include <signal.h> /*Signal handler*/
 
 #include "log.h"
@@ -94,18 +93,9 @@ void sigSetup()
 
 void sigHandler(int sig)
 {
-    if(sig==SIGINT)
-    {
-        printf("\nShutting down ...\n");
+    if (sig == SIGINT || sig == SIGTERM) {
         g_nwws_state.exit_requested = 1;
-    }
-    if (sig==SIGTERM)
-    {
-        fprintf(stderr,"Terminating process from SIGTERM\n");
-        g_nwws_state.exit_requested = 1;
-    }
-    if (sig==SIGPIPE)
-    {
+    } else if (sig == SIGPIPE) {
         g_nwws_state.reconnect_requested = 1;
     }
 }
