@@ -53,7 +53,8 @@ Example:
 - Joins `nwws@conference.nwws-oi.weather.gov/<user name>`
 - Parses incoming message stanzas and writes valid bulletins to files
 - Uses timed health checks and XMPP pings
-- Reconnects on disconnect/health-check failure/SIGPIPE unless shutdown is requested
+- Disables XMPP Stream Management and reconnects on disconnect, health-check
+  failure, ping failure, or SIGPIPE unless shutdown is requested
 
 ## Bulletin Storage
 
@@ -69,8 +70,8 @@ Example:
 
 ## Monitoring Signal
 
-- If no valid bulletin was written during the alarm interval, the client creates
-  `/tmp/nwws_alarm.txt` and sets reconnect requested state.
+- If no valid bulletin was written during the alarm interval, the client logs a
+  warning and requests a reconnect.
 
 ## Logging
 

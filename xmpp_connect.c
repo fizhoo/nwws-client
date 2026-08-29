@@ -189,7 +189,7 @@ static int message_handler(xmpp_conn_t * const conn,
         xmpp_free(ctx,payload);
         return 1;
     }
-    
+
     /* Send payload (actual NWS bulletin) to file write */
     if ((write_data(payload, payload_length, cccc, awipsid, ttaaii, id)) < 0)
     {
@@ -292,9 +292,6 @@ static void conn_handler(xmpp_conn_t * const conn,
                          xmpp_stream_error_t * const stream_error,
                          void * const userdata)
 {
-    (void) error;
-    (void) stream_error;
-    
     xmpp_ctx_t *ctx = (xmpp_ctx_t *)userdata;
 
     /* Set up presence stanza */
@@ -328,7 +325,14 @@ log_debug("reconnect req = %d\n",g_nwws_state.reconnect_requested);
         xmpp_stanza_release(pres);
     }
     else {
-        log_debug("disconnected");
+        if (stream_error != NULL) {
+            log_warn("XMPP connection ended: status=%d error=%d "
+                     "stream_error_type=%d text=%s",
+                     status, error, stream_error->type,
+                     stream_error->text != NULL ? stream_error->text : "(none)");
+        } else {
+            log_warn("XMPP connection ended: status=%d error=%d", status, error);
+        }
         if(g_nwws_state.exit_requested != 1) {
             reset_connection_runtime_state();
             g_nwws_state.reconnect_requested = 1;
