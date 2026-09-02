@@ -55,6 +55,8 @@ Example:
 - Uses timed health checks and XMPP pings
 - Disables XMPP Stream Management and reconnects on disconnect, health-check
   failure, ping failure, or SIGPIPE unless shutdown is requested
+- Waits five seconds before every reconnect attempt
+- Exits with an error after five reconnect attempts to protect the account
 
 ## Bulletin Storage
 

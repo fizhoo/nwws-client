@@ -73,9 +73,7 @@ int main(int argc, char **argv)
 
     /* enter the event loop */
 
-    nwws_connect_new (jid,pass);
-
-    return 0;
+    return nwws_connect_new(jid, pass);
 }
 
 void sigSetup()

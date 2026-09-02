@@ -60,7 +60,13 @@
 
 static const char *host = "nwws-oi.weather.gov";
 static const unsigned int reconnect_delay_seconds = 5;
+static const unsigned int max_reconnect_attempts = 5;
 static bool handlers_registered = false;
+
+typedef struct {
+    bool initial_attempt_made;
+    unsigned int reconnect_attempts;
+} connection_attempt_state_t;
 
 static int message_handler(xmpp_conn_t * const conn,
                            xmpp_stanza_t * const stanza,
@@ -71,8 +77,12 @@ static void conn_handler(xmpp_conn_t * const conn,
                          xmpp_stream_error_t * const stream_error,
                          void * const userdata);
 static int nwws_connect_with_retry(xmpp_conn_t *conn, const char *host,
-                                  unsigned short port, xmpp_ctx_t *ctx);
-static void nwws_run_loop(xmpp_conn_t *conn, xmpp_ctx_t *ctx);
+                                  unsigned short port, xmpp_ctx_t *ctx,
+                                  connection_attempt_state_t *attempt_state);
+static int nwws_run_loop(xmpp_conn_t *conn, xmpp_ctx_t *ctx,
+                         connection_attempt_state_t *attempt_state);
+static bool reconnect_limit_reached(
+    const connection_attempt_state_t *attempt_state);
 static void reset_connection_runtime_state(void);
 static void run_retry_delay(xmpp_ctx_t *ctx, unsigned int delay_ms);
 
@@ -88,6 +98,19 @@ static int stanza_attributes_missing(const char *awipsid,
 static void reset_connection_runtime_state(void)
 {
     xmpp_ping_reset_state();
+}
+
+static bool reconnect_limit_reached(
+    const connection_attempt_state_t *attempt_state)
+{
+    if (attempt_state->reconnect_attempts < max_reconnect_attempts) {
+        return false;
+    }
+
+    log_error("XMPP reconnect limit reached after %u attempts; "
+              "exiting to protect the account.",
+              max_reconnect_attempts);
+    return true;
 }
 
 static void run_retry_delay(xmpp_ctx_t *ctx, unsigned int delay_ms)
@@ -282,9 +305,7 @@ int nwws_connect_new (const char *jid, const char *pass)
      * To separate the function calls from main */
      
     // Call nwws_connect (generic connect function)
-    nwws_connect(conn, host, 5222, ctx);
-    
-    return 0;
+    return nwws_connect(conn, host, 5222, ctx);
 }
 static void conn_handler(xmpp_conn_t * const conn,
                          const xmpp_conn_event_t status,
@@ -341,15 +362,23 @@ log_debug("reconnect req = %d\n",g_nwws_state.reconnect_requested);
 }
 int nwws_connect(xmpp_conn_t *conn, const char *host, unsigned short port,xmpp_ctx_t *ctx)
 {
-    if (nwws_connect_with_retry(conn, host, port, ctx) != 0) {
-        return 1;
+    connection_attempt_state_t attempt_state = {0};
+    int result;
+
+    result = nwws_connect_with_retry(conn, host, port, ctx, &attempt_state);
+    if (result == 0) {
+        result = nwws_run_loop(conn, ctx, &attempt_state);
     }
 
-    nwws_run_loop(conn, ctx);
-    log_info("Shutdown requested; disconnecting.");
+    if (g_nwws_state.exit_requested == 1) {
+        result = 0;
+        log_info("Shutdown requested; disconnecting.");
+    } else {
+        log_error("XMPP client is stopping after exhausting reconnect attempts.");
+    }
     nwws_disconnect(conn, ctx);
-    
-    return 0;
+
+    return result;
 }
 
 int nwws_disconnect(xmpp_conn_t *conn, xmpp_ctx_t *ctx)
@@ -374,9 +403,9 @@ int nwws_disconnect(xmpp_conn_t *conn, xmpp_ctx_t *ctx)
 }
 
 static int nwws_connect_with_retry(xmpp_conn_t *conn, const char *host,
-                                  unsigned short port, xmpp_ctx_t *ctx)
+                                  unsigned short port, xmpp_ctx_t *ctx,
+                                  connection_attempt_state_t *attempt_state)
 {
-    int attempt = 0;
     const unsigned int retry_interval_ms = reconnect_delay_seconds * 1000;
     int rc;
 
@@ -395,11 +424,25 @@ static int nwws_connect_with_retry(xmpp_conn_t *conn, const char *host,
             continue;
         }
 
+        if (attempt_state->initial_attempt_made) {
+            if (reconnect_limit_reached(attempt_state)) {
+                return 1;
+            }
+            attempt_state->reconnect_attempts++;
+            log_warn("Starting XMPP reconnect attempt %u of %u.",
+                     attempt_state->reconnect_attempts,
+                     max_reconnect_attempts);
+        } else {
+            attempt_state->initial_attempt_made = true;
+        }
+
         rc = xmpp_connect_client(conn, host, port, conn_handler, ctx);
         if (rc != XMPP_EOK) {
-            attempt++;
-            log_error("Can't connect to server (attempt %d). Retrying in %u seconds.",
-                      attempt, reconnect_delay_seconds);
+            if (reconnect_limit_reached(attempt_state)) {
+                return 1;
+            }
+            log_error("Can't connect to server. Retrying in %u seconds.",
+                      reconnect_delay_seconds);
             run_retry_delay(ctx, retry_interval_ms);
             continue;
         }
@@ -414,27 +457,42 @@ static int nwws_connect_with_retry(xmpp_conn_t *conn, const char *host,
             return 0;
         }
 
-        attempt++;
-        log_error("Can't connect to server (attempt %d). Retrying in %u seconds.",
-                  attempt, reconnect_delay_seconds);
+        if (reconnect_limit_reached(attempt_state)) {
+            return 1;
+        }
+        log_error("Can't connect to server. Retrying in %u seconds.",
+                  reconnect_delay_seconds);
         run_retry_delay(ctx, retry_interval_ms);
     }
 
     return 1;
 }
 
-static void nwws_run_loop(xmpp_conn_t *conn, xmpp_ctx_t *ctx)
+static int nwws_run_loop(xmpp_conn_t *conn, xmpp_ctx_t *ctx,
+                         connection_attempt_state_t *attempt_state)
 {
     while (g_nwws_state.exit_requested != 1) {
         if (g_nwws_state.reconnect_requested == 1) {
             if (xmpp_conn_is_connected(conn)) {
                 xmpp_disconnect(conn);
             } else if (xmpp_conn_is_disconnected(conn)) {
-                if (nwws_connect_with_retry(conn, host, 5222, ctx) != 0) {
-                    return;
+                if (reconnect_limit_reached(attempt_state)) {
+                    return 1;
+                }
+                log_warn("Reconnecting to XMPP server in %u seconds.",
+                         reconnect_delay_seconds);
+                run_retry_delay(ctx, reconnect_delay_seconds * 1000);
+                if (g_nwws_state.exit_requested == 1) {
+                    return 0;
+                }
+                if (nwws_connect_with_retry(conn, host, 5222, ctx,
+                                            attempt_state) != 0) {
+                    return 1;
                 }
             }
         }
         xmpp_run_once(ctx, 1000);
     }
+
+    return 0;
 }
