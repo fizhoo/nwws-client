@@ -40,6 +40,7 @@ typedef struct {
     volatile sig_atomic_t exit_requested;
     volatile sig_atomic_t data_received;
     volatile sig_atomic_t reconnect_requested;
+    unsigned int reconnect_attempts;
 } nwws_state_t;
 
 extern nwws_state_t g_nwws_state;

@@ -136,6 +136,12 @@ int xmpp_ping_stanza_handler(xmpp_conn_t * const conn,
             awaiting_pong = false;
             pending_ping_id[0] = '\0';
             log_debug("Received XMPP pong from server. id=%s", id);
+            if (g_nwws_state.reconnect_attempts > 0) {
+                log_info("XMPP connection is healthy; resetting reconnect "
+                         "attempt counter from %u to 0.",
+                         g_nwws_state.reconnect_attempts);
+                g_nwws_state.reconnect_attempts = 0;
+            }
         }
     }
 
